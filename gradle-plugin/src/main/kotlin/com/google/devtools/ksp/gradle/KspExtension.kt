@@ -21,20 +21,33 @@ import org.gradle.api.GradleException
 import org.gradle.process.CommandLineArgumentProvider
 
 open class KspExtension {
-    internal val apOptions = mutableMapOf<String, String>()
-    internal val commandLineArgumentProviders = mutableListOf<CommandLineArgumentProvider>()
+    internal val apOptions = mutableListOf<ApOptionsVariantAware>()
+    internal val commandLineArgumentProviders = mutableMapOf<CommandLineArgumentProvider,Boolean>()
 
-    open val arguments: Map<String, String> get() = apOptions.toMap()
+    open val arguments: List<ApOptionsVariantAware> get() = apOptions.toList()
 
     open fun arg(k: String, v: String) {
+        checkOptionName(k)
+        apOptions.add(ApOptionsVariantAware(k, v))
+    }
+
+    open fun arg(k: String, v: String, variantAware: Boolean) {
+        checkOptionName(k)
+        apOptions.add(ApOptionsVariantAware(k, v, variantAware))
+    }
+
+    private fun checkOptionName(k: String) {
         if ('=' in k) {
             throw GradleException("'=' is not allowed in custom option's name.")
         }
-        apOptions.put(k, v)
     }
 
     open fun arg(arg: CommandLineArgumentProvider) {
-        commandLineArgumentProviders.add(arg)
+        commandLineArgumentProviders[arg] = false
+    }
+
+    open fun arg(arg: CommandLineArgumentProvider, variantAware: Boolean) {
+        commandLineArgumentProviders[arg] = true
     }
 
     open var blockOtherCompilerPlugins: Boolean = false
@@ -47,3 +60,5 @@ open class KspExtension {
     // Treat all warning as errors.
     open var allWarningsAsErrors: Boolean = false
 }
+
+data class ApOptionsVariantAware(val key: String, val value: String, val variantAware: Boolean = false) : java.io.Serializable

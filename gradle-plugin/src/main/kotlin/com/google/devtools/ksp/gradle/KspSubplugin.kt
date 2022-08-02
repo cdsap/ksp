@@ -163,14 +163,23 @@ class KspGradleSubplugin @Inject internal constructor(private val registry: Tool
             )
 
             kspExtension.apOptions.forEach {
-                options += SubpluginOption("apoption", "${it.key}=${it.value}")
+                options += if(it.variantAware) {
+                    SubpluginOption("apoption", "${it.key}=${it.value}/${sourceSetName}")
+                } else{
+                    SubpluginOption("apoption", "${it.key}=${it.value}")
+                }
+
             }
             kspExtension.commandLineArgumentProviders.forEach {
-                val argument = it.asArguments().joinToString("")
+                val argument = it.key.asArguments().joinToString("")
                 if (!argument.matches(Regex("\\S+=\\S+"))) {
                     throw IllegalArgumentException("KSP apoption does not match \\S+=\\S+: $argument")
                 }
-                options += SubpluginOption("apoption", argument)
+                options += if(it.value) {
+                    SubpluginOption("apoption", "$argument/$sourceSetName")
+                } else{
+                    SubpluginOption("apoption", "$argument")
+                }
             }
             return options
         }
@@ -264,7 +273,7 @@ class KspGradleSubplugin @Inject internal constructor(private val registry: Tool
                     )
                 }
             )
-            kspTask.commandLineArgumentProviders.addAll(kspExtension.commandLineArgumentProviders)
+            kspTask.commandLineArgumentProviders.addAll(kspExtension.commandLineArgumentProviders.keys)
             kspTask.destination = kspOutputDir
             kspTask.blockOtherCompilerPlugins = kspExtension.blockOtherCompilerPlugins
             kspTask.apOptions.value(kspExtension.arguments).disallowChanges()
@@ -453,7 +462,7 @@ interface KspTask : Task {
     var blockOtherCompilerPlugins: Boolean
 
     @get:Input
-    val apOptions: MapProperty<String, String>
+    val apOptions: ListProperty<ApOptionsVariantAware>
 
     @get:Classpath
     val processorClasspath: ConfigurableFileCollection
