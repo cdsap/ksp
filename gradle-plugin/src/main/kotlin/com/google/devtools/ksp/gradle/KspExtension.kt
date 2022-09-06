@@ -24,8 +24,6 @@ open class KspExtension {
     internal val apOptions = mutableMapOf<String, String>()
     internal val commandLineArgumentProviders = mutableListOf<CommandLineArgumentProvider>()
 
-    open val arguments: Map<String, String> get() = apOptions.toMap()
-
     open fun arg(k: String, v: String) {
         if ('=' in k) {
             throw GradleException("'=' is not allowed in custom option's name.")
@@ -34,7 +32,6 @@ open class KspExtension {
     }
 
     open fun arg(arg: CommandLineArgumentProvider) {
-        println("adding parameter "+arg.asArguments())
         commandLineArgumentProviders.add(arg)
     }
 
