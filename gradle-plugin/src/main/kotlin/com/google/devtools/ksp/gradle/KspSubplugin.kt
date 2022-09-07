@@ -139,40 +139,33 @@ class KspGradleSubplugin @Inject internal constructor(private val registry: Tool
             target: String,
             isIncremental: Boolean,
             allWarningsAsErrors: Boolean,
-        ): List<SubpluginOption> {
-            val options = mutableListOf<SubpluginOption>()
-            options += SubpluginOption("classOutputDir", getKspClassOutputDir(project, sourceSetName, target).path)
-            options += SubpluginOption("javaOutputDir", getKspJavaOutputDir(project, sourceSetName, target).path)
-            options += SubpluginOption("kotlinOutputDir", getKspKotlinOutputDir(project, sourceSetName, target).path)
-            options += SubpluginOption(
-                "resourceOutputDir",
-                getKspResourceOutputDir(project, sourceSetName, target).path
-            )
-            options += SubpluginOption("cachesDir", getKspCachesDir(project, sourceSetName, target).path)
-            options += SubpluginOption("kspOutputDir", getKspOutputDir(project, sourceSetName, target).path)
-            options += SubpluginOption("incremental", isIncremental.toString())
-            options += SubpluginOption(
-                "incrementalLog",
-                project.findProperty("ksp.incremental.log")?.toString() ?: "false"
-            )
-            options += SubpluginOption("projectBaseDir", project.project.projectDir.canonicalPath)
-            options += SubpluginOption("allWarningsAsErrors", allWarningsAsErrors.toString())
-            options += FilesSubpluginOption("apclasspath", classpath.toList())
-            // Turn this on by default to work KT-30172 around. It is off by default in the ccompiler plugin.
-            options += SubpluginOption(
-                "returnOkOnError",
-                project.findProperty("ksp.return.ok.on.error")?.toString() ?: "true"
-            )
+        ): List<ApOptionSerialized> {
+            val options = mutableListOf<ApOptionSerialized>()
+            options += ApOptionString("classOutputDir",getKspClassOutputDir(project, sourceSetName, target).path)
+            options += ApOptionString("javaOutputDir",getKspJavaOutputDir(project, sourceSetName, target).path)
+            options += ApOptionString("kotlinOutputDir",getKspKotlinOutputDir(project, sourceSetName, target).path)
+            options += ApOptionString("resourceOutputDir", getKspKotlinOutputDir(project, sourceSetName, target).path)
+            options += ApOptionString("cachesDir", getKspCachesDir(project, sourceSetName, target).path)
+            options += ApOptionString("kspOutputDir", getKspOutputDir(project, sourceSetName, target).path)
+            options += ApOptionString("incremental", isIncremental.toString())
+            options += ApOptionString("incrementalLog",project.findProperty("ksp.incremental.log")?.toString() ?: "false")
+            options += ApOptionString("projectBaseDir", project.project.projectDir.canonicalPath)
+            options += ApOptionString("allWarningsAsErrors", allWarningsAsErrors.toString())
+            options +=ApOptionString(
+                    "returnOkOnError",
+                    project.findProperty("ksp.return.ok.on.error")?.toString() ?: "true"
+                )
+            options += ApOptionFileList("apclasspath", classpath.toList())
 
             kspExtension.apOptions.forEach {
-                options += SubpluginOption("apoption", "${it.key}=${it.value}")
+                options += ApOptionString("apoption", "${it.key}=${it.value}")
             }
             kspExtension.commandLineArgumentProviders.forEach {
                 val argument = it.asArguments().joinToString("")
                 if (!argument.matches(Regex("\\S+=\\S+"))) {
                     throw IllegalArgumentException("KSP apoption does not match \\S+=\\S+: $argument")
                 }
-                options += SubpluginOption("apoption", argument)
+                options += ApOptionString("apoption", argument)
             }
             return options
         }
@@ -266,10 +259,8 @@ class KspGradleSubplugin @Inject internal constructor(private val registry: Tool
                     )
                 }
             )
-            kspTask.commandLineArgumentProviders.addAll(kspExtension.commandLineArgumentProviders)
             kspTask.destination = kspOutputDir
             kspTask.blockOtherCompilerPlugins = kspExtension.blockOtherCompilerPlugins
-            kspTask.apOptions.value(kspExtension.arguments).disallowChanges()
             kspTask.kspCacheDir.fileValue(getKspCachesDir(project, sourceSetName, target)).disallowChanges()
 
             if (kspExtension.blockOtherCompilerPlugins) {
@@ -438,11 +429,8 @@ internal fun findJavaTaskForKotlinCompilation(compilation: KotlinCompilation<*>)
     }
 
 interface KspTask : Task {
-    @get:Internal
-    val options: ListProperty<SubpluginOption>
-
-    @get:Nested
-    val commandLineArgumentProviders: ListProperty<CommandLineArgumentProvider>
+    @get:Input
+    val options: ListProperty<ApOptionSerialized>
 
     @get:OutputDirectory
     var destination: File
@@ -453,9 +441,6 @@ interface KspTask : Task {
 
     @get:Input
     var blockOtherCompilerPlugins: Boolean
-
-    @get:Input
-    val apOptions: MapProperty<String, String>
 
     @get:Classpath
     val processorClasspath: ConfigurableFileCollection
@@ -625,7 +610,7 @@ abstract class KspTaskJvm @Inject constructor(
         if (blockOtherCompilerPlugins) {
             args.blockOtherPlugins(overridePluginClasspath.get())
         }
-        args.addPluginOptions(options.get())
+        args.addPluginOptions(options.get().toSubPluginOptionList())
         args.destinationAsFile = destination
         args.allowNoSourceFiles = true
         args.useK2 = false
@@ -744,7 +729,7 @@ abstract class KspTaskJS @Inject constructor(
         if (blockOtherCompilerPlugins) {
             args.blockOtherPlugins(overridePluginClasspath.get())
         }
-        args.addPluginOptions(options.get())
+        args.addPluginOptions(options.get().toSubPluginOptionList())
         args.outputFile = File(destination, "dummyOutput.js").canonicalPath
         kotlinOptions.copyFreeCompilerArgsToArgs(args)
         args.useK2 = false
@@ -828,7 +813,7 @@ abstract class KspTaskMetadata @Inject constructor(
         if (blockOtherCompilerPlugins) {
             args.blockOtherPlugins(overridePluginClasspath.get())
         }
-        args.addPluginOptions(options.get())
+        args.addPluginOptions(options.get().toSubPluginOptionList())
         args.destination = destination.canonicalPath
         val classpathList = libraries.files.filter { it.exists() }.toMutableList()
         args.classpath = classpathList.joinToString(File.pathSeparator)
@@ -875,7 +860,7 @@ abstract class KspTaskNative @Inject constructor(
     override val additionalCompilerOptions: Provider<Collection<String>>
         get() {
             return project.provider {
-                val kspOptions = options.get().flatMap { listOf("-P", it.toArg()) }
+                val kspOptions = options.get().toSubPluginOptionList().flatMap { listOf("-P", it.toArg()) }
                 super.additionalCompilerOptions.get() + kspOptions
             }
         }
@@ -900,7 +885,7 @@ abstract class KspTaskNative @Inject constructor(
     // Use a name that gets sorted in the front just in case. `_$` is lower, but it might be too hacky.
     @TaskAction
     fun _0() {
-        options.get().single { it.key == "kspOutputDir" }.value.let {
+        options.get().toSubPluginOptionList().single { it.key == "kspOutputDir" }.value.let {
             File(it).deleteRecursively()
         }
         super.compile()
@@ -988,3 +973,20 @@ internal fun File.isParentOf(childCandidate: File): Boolean {
 
     return childCandidatePath.startsWith(parentPath)
 }
+
+internal fun List<ApOptionSerialized>.toSubPluginOptionList(): List<SubpluginOption> {
+    val options = mutableListOf<SubpluginOption>()
+    this.forEach {
+        if (it is ApOptionFileList) {
+            options.add(FilesSubpluginOption(it.key, it.fileListValue))
+        } else if (it is ApOptionString) {
+            options.add(SubpluginOption(it.key, it.stringValue))
+        }
+    }
+    return options
+}
+
+sealed class ApOptionSerialized(val key: String, val value: Any) : java.io.Serializable
+data class ApOptionString(val id: String, val stringValue: String) : ApOptionSerialized(id, stringValue)
+data class ApOptionFileList(val id: String, val fileListValue: List<File>) : ApOptionSerialized(id, fileListValue)
+
