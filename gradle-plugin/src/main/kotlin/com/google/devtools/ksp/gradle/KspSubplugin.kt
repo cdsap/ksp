@@ -288,7 +288,7 @@ class KspGradleSubplugin @Inject internal constructor(private val registry: Tool
             kspTask.blockOtherCompilerPlugins = kspExtension.blockOtherCompilerPlugins
             kspTask.apOptions.value(kspExtension.arguments).disallowChanges()
             kspTask.kspCacheDir.fileValue(getKspCachesDir(project, sourceSetName, target)).disallowChanges()
-
+             println("aslaslksakasksak")
             if (kspExtension.blockOtherCompilerPlugins) {
                 kspTask.overridePluginClasspath.from(kspClasspathCfg)
             }

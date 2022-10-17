@@ -75,6 +75,7 @@ class TestProject(
             android.useAndroidX=true
             org.gradle.jvmargs=-Xmx2048M -XX:MaxMetaspaceSize=512m
         """.trimIndent()
+        rootDir.resolve("local.properties").writeText("sdk.dir=/Users/inakivillar/Library/Android/sdk")
         rootDir.resolve("gradle.properties").writeText(contents)
     }
 
