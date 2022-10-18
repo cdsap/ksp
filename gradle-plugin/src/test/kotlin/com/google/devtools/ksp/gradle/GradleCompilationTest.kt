@@ -236,8 +236,7 @@ class GradleCompilationTest {
     }
 
     @Test
-    fun commandLineArgumentIsIncludedInApoptions() {
-        Assume.assumeFalse(System.getProperty("os.name").startsWith("Windows", ignoreCase = true))
+    fun commandLineArgumentIsIncludedInApoptionsWhenAddedInKspTask() {
         testRule.setupAppAsAndroidApp()
         testRule.appModule.dependencies.addAll(
             listOf(
@@ -261,19 +260,23 @@ class GradleCompilationTest {
                   tasks.withType<com.google.devtools.ksp.gradle.KspTask>().configureEach {
                     val destination = project.layout.projectDirectory.dir("schemas-${'$'}{this.name}")
                     commandLineArgumentProviders.add(Provider(destination.asFile))
+
                     options.get().forEach { option ->
                       println("${'$'}{option.key}=${'$'}{option.value}")
                     }
+                    commandLineArgumentProviders.get().forEach { commandLine ->
+                      println("commandLine=${'$'}{commandLine.asArguments()}")
+                    }
                   }
                 }
-
             """.trimIndent()
         )
         val result = testRule.runner().withDebug(true).withArguments(":app:assembleDebug").build()
-        println(result.output)
         val pattern1 = Regex.escape("apoption=room.schemaLocation=")
         val pattern2 = Regex.escape("${testRule.appModule.moduleRoot}/schemas-kspDebugKotlin")
+        val pattern3 = Regex.escape("commandLine=[")
         assertThat(result.output).containsMatch("$pattern1\\S*$pattern2")
+        assertThat(result.output).containsMatch("$pattern3\\S*$pattern2")
     }
 }
 
