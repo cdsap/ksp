@@ -65,8 +65,8 @@ jobs:
       shell: bash
       run: |
         ./gradlew publishToMavenLocal
-        git clone https://github.com/cdsap/KspNowInAndroid.git
-        cd KspNowInAndroid
-        ./gradlew assembleDebug
+        curl -s -L -O https://github.com/gradle/develocity-build-validation-scripts/releases/download/v2.8/develocity-gradle-build-validation-2.8.zip && unzip -q -o develocity-gradle-build-validation-2.8.zip
+        cd develocity-gradle-build-validation-2.8
+        ./03-validate-local-build-caching-different-locations.sh -t assembleDebug -r https://github.com/cdsap/KspNowInAndroid.git
       env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DV_KEY }}
