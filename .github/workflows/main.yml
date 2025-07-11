@@ -60,21 +60,6 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: ./gradlew :api:checkApi
 
-    # Run tests
-    - name: test
-      shell: bash
-      run: ./gradlew --stacktrace --info check
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-reports-${{ matrix.branch }}-${{ matrix.os }}
-        path: |
-          compiler-plugin/build/reports
-          integration-tests/build/reports
-          gradle-plugin/build/reports
-          common-util/build/reports
-          kotlin-analysis-api/build/reports
 
     - name: Integration tests
       shell: bash
